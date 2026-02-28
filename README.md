@@ -6,7 +6,8 @@ Minecraft server panel for Termux (Android). Aternos-style web UI.
 
 Paste this in Termux:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/loaf1ms/mc-control/main/setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/loaf1ms/mc-control/main/setup.sh -o setup.sh
+bash setup.sh
 ```
 
 Then start it:
