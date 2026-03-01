@@ -61,7 +61,7 @@ The setup script automatically installs OpenJDK 21, Node.js, and tmux.
 
 - Keep your phone **plugged in** while the server runs — Java is heavy on battery
 - Run `termux-wake-lock` (requires Termux:API from F-Droid) to prevent Android from killing the server
-- Use **Paper** over Vanilla for much better performance on ARM
+- Use **Paper** over Vanilla or fabric for much better performance on ARM
 - Set `view-distance=6` in Properties if the server feels slow
 
 ---
