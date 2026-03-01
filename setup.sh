@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # ╔══════════════════════════════════════════════════════════╗
-# ║        MC Control v2 — Termux Setup Script              ║
-# ║   Full Aternos-style panel · Java Edition               ║
+# ║            MC Control — Termux Setup Script              ║
+# ║         Full Aternos-style panel · Java Edition          ║
 # ╚══════════════════════════════════════════════════════════╝
 
 set -e
@@ -50,7 +50,7 @@ curl -fsSL "$REPO_RAW/package.json" -o "$UI_DIR_EARLY/package.json" || err "Fail
 log "Files downloaded to ~/mc-control/"
 
 # ── Step 1: Install packages ──────────────────────────────────────────────────
-step "Step 1/6 — Installing packages"
+step "Step 1/5 — Installing packages"
 
 info "Updating package lists..."
 pkg update -y 2>/dev/null || warn "pkg update had warnings (usually fine)"
@@ -66,7 +66,7 @@ log "Node.js $(node --version)  /  npm $(npm --version)"
 pkg install -y curl 2>/dev/null || true
 
 # ── Step 2: Phantom process killer fix ───────────────────────────────────────
-step "Step 2/6 — Android phantom process killer"
+step "Step 2/5 — Android phantom process killer"
 
 echo ""
 echo -e "  ${A}IMPORTANT:${N} Android 12+ has a 'phantom process killer'"
@@ -95,40 +95,11 @@ else
   info "Skipping tmux"
 fi
 
-# ── Step 3: RAM config ────────────────────────────────────────────────────────
-step "Step 3/6 — RAM configuration"
+MC_RAM="2G"
+log "Server RAM defaulted to 2G (change anytime in the Settings tab)"
 
-TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
-TOTAL_RAM_GB=$(echo "$TOTAL_RAM_KB" | awk '{printf "%.0f", $1/1024/1024}')
-
-echo ""
-if [ "$TOTAL_RAM_GB" -gt 0 ] 2>/dev/null; then
-  echo -e "  Detected phone RAM: ${G}${TOTAL_RAM_GB}GB total${N}"
-  REC_RAM=$(echo "$TOTAL_RAM_GB" | awk '{
-    r = int($1 * 0.4)
-    if (r < 1) r = 1
-    if (r > 4) r = 4
-    print r
-  }')
-  echo -e "  Recommended server RAM: ${G}${REC_RAM}G${N}  (≈40% of total)"
-else
-  REC_RAM=1
-  warn "Couldn't detect phone RAM — defaulting to 1G recommendation"
-fi
-
-echo ""
-echo -e "  ${D}Rule of thumb: don't give more than 50% of your phone RAM${N}"
-echo -e "  ${D}4GB phone → 1G  |  6GB phone → 2G  |  8GB phone → 3G${N}"
-echo ""
-read -p "  RAM for the Minecraft server [${REC_RAM}G]: " USER_RAM
-# Normalise: strip trailing G/g, then re-add
-RAW="${USER_RAM:-${REC_RAM}}"
-RAW=$(echo "$RAW" | sed 's/[Gg]$//')
-MC_RAM="${RAW}G"
-log "Server RAM set to: $MC_RAM"
-
-# ── Step 4: Directories & files ───────────────────────────────────────────────
-step "Step 4/6 — Setting up directories"
+# ── Step 3: Directories & files ───────────────────────────────────────────────
+step "Step 3/5 — Setting up directories"
 
 MC_DIR="$HOME/minecraft"
 UI_DIR="$HOME/mc-control"
@@ -167,19 +138,33 @@ cat > "$UI_DIR/package.json" << 'PKGJSON'
 PKGJSON
 log "package.json written"
 
-# Pre-accept EULA so the server doesn't refuse to boot
+# ── EULA ─────────────────────────────────────────────────────────────────────
+echo ""
+echo -e "  ${A}Minecraft End User License Agreement (EULA)${N}"
+echo -e "  By running a Minecraft server you agree to Mojang's EULA:"
+echo -e "  ${B}https://aka.ms/MinecraftEULA${N}"
+echo ""
+read -p "  Do you accept the Minecraft EULA? [Y/n]: " eula_ans
+if [[ "$eula_ans" == "n" || "$eula_ans" == "N" ]]; then
+  echo ""
+  warn "EULA not accepted. Cleaning up and exiting..."
+  rm -rf "$UI_DIR" "$MC_DIR" "$HOME/start-mc.sh" "$HOME/start-mc-bg.sh" 2>/dev/null || true
+  echo -e "  ${R}Setup cancelled.${N}"
+  echo ""
+  exit 1
+fi
 echo "eula=true" > "$MC_DIR/eula.txt"
-log "eula.txt written (Mojang EULA pre-accepted)"
+log "EULA accepted — eula.txt written"
 
-# ── Step 5: Node dependencies ─────────────────────────────────────────────────
-step "Step 5/6 — Installing Node.js dependencies"
+# ── Step 4: Node dependencies ─────────────────────────────────────────────────
+step "Step 4/5 — Installing Node.js dependencies"
 
 cd "$UI_DIR"
 npm install
 log "express + ws installed"
 
-# ── Step 6: Launch scripts ────────────────────────────────────────────────────
-step "Step 6/6 — Creating launch scripts"
+# ── Step 5: Launch scripts ────────────────────────────────────────────────────
+step "Step 5/5 — Creating launch scripts"
 
 # Normal start script
 cat > "$HOME/start-mc.sh" << STARTSCRIPT
@@ -197,7 +182,7 @@ command -v termux-wake-lock &>/dev/null && termux-wake-lock
 LOCAL_IP=\$(hostname -I 2>/dev/null | awk '{print \$1}')
 
 echo ""
-echo -e "  ⬛  MC Control v2 starting..."
+echo -e "  ⬛  MC Control starting..."
 echo -e "  Browser (this phone):  http://localhost:\$UI_PORT"
 [ -n "\$LOCAL_IP" ] && echo -e "  Browser (same WiFi):   http://\$LOCAL_IP:\$UI_PORT"
 echo -e "  Use the Version tab to download a server JAR if you haven't yet."
@@ -216,7 +201,7 @@ log "Created ~/start-mc.sh"
 if command -v tmux &>/dev/null; then
   cat > "$HOME/start-mc-bg.sh" << BGSCRIPT
 #!/data/data/com.termux/files/usr/bin/bash
-# MC Control v2 — Background mode (tmux)
+# MC Control — Background mode (tmux)
 # Server keeps running even if you close the Termux window
 
 MC_RAM="$MC_RAM"
