@@ -1,5 +1,5 @@
 {
-  "name": "droid-mc",
+  "name": "DroidMC",
   "version": "2.0.0",
   "description": "DroidMC — Minecraft Server Panel for Termux",
   "main": "server.js",

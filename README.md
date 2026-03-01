@@ -69,7 +69,7 @@ The setup script automatically installs OpenJDK 21, Node.js, and tmux.
 ## File Structure
 
 ```
-~/droid-mc/
+~/DroidMC/
 ├── server.js          ← Backend & API
 ├── package.json       ← Node dependencies
 ├── config.json        ← Saved settings

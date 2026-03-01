@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * DroidMC — Full Minecraft Server Panel for Termux
- * Like Aternos, but on your phone. http://localhost:8080
+ * Copyright (c) 2026 by Loaf1ms
  */
 
 const express  = require('express');
@@ -25,7 +25,7 @@ let startTime     = null;
 let downloadState = null;
 let systemStats   = { cpu: 0, ram: 0 };
 
-const CONFIG_FILE = path.join(process.env.HOME || '/data/data/com.termux/files/home', 'droid-mc', 'config.json');
+const CONFIG_FILE = path.join(process.env.HOME || '/data/data/com.termux/files/home', 'DroidMC', 'config.json');
 const CONFIG_DEFAULTS = {
   serverJar: process.env.MC_JAR  || 'server.jar',
   serverDir: process.env.MC_DIR  || `${process.env.HOME || '/data/data/com.termux/files/home'}/minecraft`,

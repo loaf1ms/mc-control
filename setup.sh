@@ -39,8 +39,8 @@ fi
 # ── Download project files from GitHub ───────────────────────────────────────
 step "Downloading DroidMC files"
 
-REPO_RAW="https://raw.githubusercontent.com/loaf1ms/droid-mc/main"
-UI_DIR_EARLY="$HOME/droid-mc"
+REPO_RAW="https://raw.githubusercontent.com/loaf1ms/DroidMC/main"
+UI_DIR_EARLY="$HOME/DroidMC"
 mkdir -p "$UI_DIR_EARLY"
 
 info "Downloading server.js..."
@@ -49,10 +49,10 @@ info "Downloading package.json..."
 curl -fsSL "$REPO_RAW/package.json" -o "$UI_DIR_EARLY/package.json" || err "Failed to download package.json"
 info "Downloading UI files..."
 mkdir -p "$UI_DIR_EARLY/public"
-curl -fsSL "$REPO_RAW/public/index.html" -o "$UI_DIR_EARLY/public/index.html" || err "Failed to download index.html"
-curl -fsSL "$REPO_RAW/public/style.css"  -o "$UI_DIR_EARLY/public/style.css"  || err "Failed to download style.css"
-curl -fsSL "$REPO_RAW/public/app.js"     -o "$UI_DIR_EARLY/public/app.js"     || err "Failed to download app.js"
-log "Files downloaded to ~/droid-mc/" 
+curl -fsSL "$REPO_RAW/index.html" -o "$UI_DIR_EARLY/public/index.html" || err "Failed to download index.html"
+curl -fsSL "$REPO_RAW/style.css"  -o "$UI_DIR_EARLY/public/style.css"  || err "Failed to download style.css"
+curl -fsSL "$REPO_RAW/app.js"     -o "$UI_DIR_EARLY/public/app.js"     || err "Failed to download app.js"
+log "Files downloaded to ~/DroidMC/" 
 
 # ── Step 1: Install packages ──────────────────────────────────────────────────
 step "Step 1/5 — Installing packages"
@@ -107,7 +107,7 @@ log "Server RAM defaulted to 2G (change anytime in the Settings tab)"
 step "Step 3/5 — Setting up directories"
 
 MC_DIR="$HOME/minecraft"
-UI_DIR="$HOME/droid-mc"
+UI_DIR="$HOME/DroidMC"
 mkdir -p "$MC_DIR" "$UI_DIR"
 log "Server folder:  $MC_DIR"
 log "Panel folder:   $UI_DIR"
@@ -115,7 +115,7 @@ log "Panel folder:   $UI_DIR"
 # Copy server.js if it's next to this script (and not already in the right place)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ "$SCRIPT_DIR" = "$UI_DIR" ]; then
-  # Already running from inside droid-mc/ — nothing to copy
+  # Already running from inside DroidMC/ — nothing to copy
   log "server.js already in place"
 elif [ -f "$SCRIPT_DIR/server.js" ]; then
   cp "$SCRIPT_DIR/server.js" "$UI_DIR/server.js"
@@ -130,7 +130,7 @@ fi
 # Write package.json
 cat > "$UI_DIR/package.json" << 'PKGJSON'
 {
-  "name": "droid-mc",
+  "name": "DroidMC",
   "version": "2.0.0",
   "description": "Minecraft Server Panel for Termux",
   "main": "server.js",
