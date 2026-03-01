@@ -17,7 +17,7 @@ pkg update && pkg upgrade -y
 Paste this in Termux:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/loaf1ms/droid-mc/main/setup.sh -o setup.sh
+curl -fsSL https://raw.githubusercontent.com/loaf1ms/DroidMC/main/setup.sh -o setup.sh
 bash setup.sh
 ```
 
