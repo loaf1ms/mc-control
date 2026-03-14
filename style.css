@@ -38,13 +38,14 @@ body {
 
 /* ─── TOP HEADER ─── */
 .topbar {
-  height: 60px;
+  min-height: 60px;
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  gap: 12px;
+  padding: 10px 20px;
   flex-shrink: 0;
   position: relative;
   z-index: 20;
@@ -139,6 +140,8 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .stat-chips {
@@ -186,7 +189,7 @@ body {
   color: #052e16;
 }
 
-.hbtn-primary:hover { background: #16a34a; border-color: #16a34a; }
+.hbtn-primary:hover:not(:disabled) { background: #16a34a; border-color: #16a34a; }
 
 .hbtn-ghost {
   background: var(--panel2);
@@ -194,7 +197,23 @@ body {
   color: var(--t);
 }
 
-.hbtn-ghost:hover { background: var(--panel3); border-color: rgba(255,255,255,0.15); }
+.hbtn-ghost:hover:not(:disabled) { background: var(--panel3); border-color: rgba(255,255,255,0.15); }
+
+.hbtn-danger {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.28);
+  color: #fca5a5;
+}
+
+.hbtn-danger:hover:not(:disabled) {
+  background: rgba(239,68,68,0.18);
+  border-color: rgba(239,68,68,0.4);
+}
+
+.hbtn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
 
 /* ─── NAVIGATION ─── */
 .tabnav {

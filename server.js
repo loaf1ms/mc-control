@@ -26,7 +26,7 @@ let logHistory    = [];
 let onlinePlayers = {};   // name ? { name, joined }
 let startTime     = null;
 let downloadState = null;
-let systemStats   = { cpu: 0, ram: 0 };
+let systemStats   = { cpu: 0, ram: 0, diskUsed: 0, diskTotal: 0 };
 
 const CONFIG_FILE = path.join(process.env.HOME || '/data/data/com.termux/files/home', 'DroidMC', 'config.json');
 const CONFIG_DEFAULTS = {
@@ -87,12 +87,41 @@ function readCpuTimes() {
   return { idle, total };
 }
 
+function resolveStatsPath(targetPath) {
+  let current = path.resolve(targetPath || __dirname);
+  while (!fs.existsSync(current)) {
+    const parent = path.dirname(current);
+    if (parent === current) return __dirname;
+    current = parent;
+  }
+  return current;
+}
+
+function updateDiskStats() {
+  try {
+    const statPath = resolveStatsPath(CONFIG.serverDir);
+    const stats = fs.statfsSync(statPath);
+    const blockSize = Number(stats.bsize || stats.frsize || 0);
+    const total = Number(stats.blocks || 0) * blockSize;
+    const free = Number((stats.bavail ?? stats.bfree) || 0) * blockSize;
+    systemStats = {
+      ...systemStats,
+      diskUsed: Math.max(total - free, 0),
+      diskTotal: total,
+    };
+  } catch {
+    systemStats = { ...systemStats, diskUsed: 0, diskTotal: 0 };
+  }
+}
+
 function updateSystemStats() {
+  updateDiskStats();
   // If pidusage is available and MC is running, use process-level stats
-  if (pidusage && mcProcess && mcProcess.pid) {
+  if (mcProcess && mcProcess.pid && pidusage) {
     pidusage(mcProcess.pid, (err, stats) => {
       if (!err && stats) {
         systemStats = {
+          ...systemStats,
           cpu: parseFloat(stats.cpu.toFixed(1)),
           ram: parseFloat((stats.memory / 1024 / 1024).toFixed(1)), // MB
         };
@@ -100,11 +129,14 @@ function updateSystemStats() {
         // fallback to system stats on error
         _updateSystemStatsFallback();
       }
-      broadcast({ type: 'stats', cpu: systemStats.cpu, ram: systemStats.ram });
+      broadcast({ type: 'stats', ...systemStats });
     });
-  } else {
+  } else if (mcProcess && mcProcess.pid) {
     _updateSystemStatsFallback();
-    broadcast({ type: 'stats', cpu: systemStats.cpu, ram: systemStats.ram });
+    broadcast({ type: 'stats', ...systemStats });
+  } else {
+    systemStats = { ...systemStats, cpu: 0, ram: 0 };
+    broadcast({ type: 'stats', ...systemStats });
   }
 }
 
@@ -122,6 +154,7 @@ function _updateSystemStatsFallback() {
   // Return RAM in MB (used RAM of total)
   const usedMB = (totMem - freeMem) / 1024 / 1024;
   systemStats = {
+    ...systemStats,
     cpu: Math.round(cpuUsage * 10) / 10,
     ram: Math.round(usedMB), // MB
   };
@@ -196,6 +229,50 @@ function httpsGet(url, depth = 0) {
   });
 }
 
+function downloadFileWithProgress(url, outPath) {
+  return new Promise((resolve, reject) => {
+    const doGet = (sourceUrl, depth = 0) => {
+      if (depth > 5) return reject(new Error('Too many redirects'));
+      const mod = sourceUrl.startsWith('https') ? https : http;
+      mod.get(sourceUrl, { headers: { 'User-Agent': 'DroidMC/2.0' } }, response => {
+        if (response.statusCode >= 300 && response.headers.location)
+          return doGet(response.headers.location, depth + 1);
+        if (response.statusCode !== 200)
+          return reject(new Error(`HTTP ${response.statusCode}`));
+
+        downloadState.total = parseInt(response.headers['content-length'] || '0');
+        let received = 0;
+        const out = fs.createWriteStream(outPath);
+        response.on('data', chunk => {
+          received += chunk.length;
+          downloadState.progress = received;
+          broadcast({ type: 'download', ...downloadState });
+        });
+        response.pipe(out);
+        out.on('finish', resolve);
+        out.on('error', reject);
+        response.on('error', reject);
+      }).on('error', reject);
+    };
+
+    doGet(url);
+  });
+}
+
+function runLoggedProcess(command, args, cwd, failureLabel) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(command, args, { cwd });
+    proc.stdout.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'system'); }));
+    proc.stderr.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'warn'); }));
+    proc.on('exit', code => code === 0 ? resolve() : reject(new Error(`${failureLabel} exited ${code}`)));
+    proc.on('error', reject);
+  });
+}
+
+function parseXmlVersions(xmlText) {
+  return [...String(xmlText).matchAll(/<version>([^<]+)<\/version>/g)].map(match => match[1]);
+}
+
 // --- Properties ---------------------------------------------------------------
 function readProperties() {
   const file = path.join(CONFIG.serverDir, 'server.properties');
@@ -254,6 +331,7 @@ app.post('/api/start', (_, res) => {
     addLog(`--- Server stopped (exit ${code ?? 'signal'}) ---`, 'system');
     if (pidusage) { try { pidusage.clear(); } catch(e) {} }
     mcProcess = null; onlinePlayers = {}; startTime = null;
+    updateSystemStats();
     broadcast({ type: 'status', running: false, players: [], uptime: null });
   });
 
@@ -299,6 +377,7 @@ app.post('/api/restart', (_, res) => {
       addLog(`--- Server stopped (exit ${code ?? 'signal'}) ---`, 'system');
       if (pidusage) { try { pidusage.clear(); } catch(e) {} }
       mcProcess = null; onlinePlayers = {}; startTime = null;
+      updateSystemStats();
       broadcast({ type: 'status', running: false, players: [], uptime: null });
     });
 
@@ -366,6 +445,7 @@ app.post('/api/config', (req, res) => {
   if (serverJar) CONFIG.serverJar = serverJar;
   if (javaPath)  CONFIG.javaPath  = javaPath;
   saveConfig();
+  updateSystemStats();
   res.json({ ok: true, config: CONFIG });
 });
 
@@ -484,6 +564,23 @@ app.get('/api/versions/forge', async (_, res) => {
   } catch (e) { res.json({ error: e.message }); }
 });
 
+app.get('/api/versions/neoforge', async (_, res) => {
+  try {
+    const xml = await httpsGet('https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml');
+    const versions = parseXmlVersions(xml);
+    const stableVersions = versions.filter(version => !/(alpha|beta|snapshot)/i.test(version));
+    res.json({ versions: (stableVersions.length ? stableVersions : versions).reverse() });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
+app.get('/api/versions/quilt', async (_, res) => {
+  try {
+    const m = await httpsGet('https://meta.quiltmc.org/v3/versions/game');
+    const releases = m.filter(v => v.stable).map(v => v.version);
+    res.json({ versions: releases });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 app.post('/api/download', async (req, res) => {
   if (downloadState && !downloadState.done && !downloadState.error)
     return res.json({ error: 'Download already in progress' });
@@ -512,37 +609,18 @@ app.post('/api/download', async (req, res) => {
       const instPath   = path.join(CONFIG.serverDir, `fabric-installer-${instVer}.jar`);
 
       addLog('--- Downloading Fabric installer... ---', 'system');
-      await new Promise((resolve, reject) => {
-        const doGetInst = (url, depth = 0) => {
-          if (depth > 5) return reject(new Error('Too many redirects'));
-          const mod = url.startsWith('https') ? https : http;
-          mod.get(url, { headers: { 'User-Agent': 'DroidMC/2.0' } }, response => {
-            if (response.statusCode >= 300 && response.headers.location) return doGetInst(response.headers.location, depth + 1);
-            if (response.statusCode !== 200) return reject(new Error(`HTTP ${response.statusCode}`));
-            downloadState.total = parseInt(response.headers['content-length'] || '0');
-            let received = 0;
-            const out = fs.createWriteStream(instPath);
-            response.on('data', chunk => { received += chunk.length; downloadState.progress = received; broadcast({ type: 'download', ...downloadState }); });
-            response.pipe(out);
-            out.on('finish', resolve); out.on('error', reject); response.on('error', reject);
-          }).on('error', reject);
-        };
-        doGetInst(instUrl);
-      });
+      await downloadFileWithProgress(instUrl, instPath);
 
       addLog('--- Running Fabric installer (this also downloads MC, may take a while)... ---', 'system');
       downloadState.name = `fabric-${version} (installing...)`;
       broadcast({ type: 'download', ...downloadState });
 
-      await new Promise((resolve, reject) => {
-        const inst = spawn(CONFIG.javaPath, [
-          '-jar', instPath, 'server', '-mcversion', version, '-loader', loaderVer, '-downloadMinecraft'
-        ], { cwd: CONFIG.serverDir });
-        inst.stdout.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'system'); }));
-        inst.stderr.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'warn'); }));
-        inst.on('exit', code => code === 0 ? resolve() : reject(new Error(`Fabric installer exited ${code}`)));
-        inst.on('error', reject);
-      });
+      await runLoggedProcess(
+        CONFIG.javaPath,
+        ['-jar', instPath, 'server', '-mcversion', version, '-loader', loaderVer, '-downloadMinecraft'],
+        CONFIG.serverDir,
+        'Fabric installer'
+      );
 
       try { fs.unlinkSync(instPath); } catch {}
       const fabricLaunch = path.join(CONFIG.serverDir, 'fabric-server-launch.jar');
@@ -559,6 +637,51 @@ app.post('/api/download', async (req, res) => {
       broadcast({ type: 'jarReady' });
       broadcast({ type: 'config', config: CONFIG });
       return;
+    } else if (type === 'quilt') {
+      const installers = await httpsGet('https://meta.quiltmc.org/v3/versions/installer');
+      const loaders = await httpsGet('https://meta.quiltmc.org/v3/versions/loader');
+      const installer = installers[0];
+      const loader = loaders.find(v => !/(alpha|beta)/i.test(v.version)) || loaders[0];
+      const instPath = path.join(CONFIG.serverDir, `quilt-installer-${installer.version}.jar`);
+
+      addLog('--- Downloading Quilt installer... ---', 'system');
+      await downloadFileWithProgress(installer.url, instPath);
+
+      addLog('--- Running Quilt installer (this also downloads MC, may take a while)... ---', 'system');
+      downloadState.name = `quilt-${version} (installing...)`;
+      broadcast({ type: 'download', ...downloadState });
+
+      await runLoggedProcess(
+        CONFIG.javaPath,
+        [
+          '-jar',
+          instPath,
+          'install',
+          'server',
+          version,
+          loader.version,
+          `--install-dir="${CONFIG.serverDir}"`,
+          '--download-server',
+        ],
+        CONFIG.serverDir,
+        'Quilt installer'
+      );
+
+      try { fs.unlinkSync(instPath); } catch {}
+      const quiltLaunch = path.join(CONFIG.serverDir, 'quilt-server-launch.jar');
+      if (!fs.existsSync(quiltLaunch)) throw new Error('Quilt installer ran but quilt-server-launch.jar not found');
+
+      CONFIG.serverJar = 'quilt-server-launch.jar';
+      CONFIG.serverType = 'quilt';
+      CONFIG.serverVersion = version;
+      saveConfig();
+      fs.writeFileSync(path.join(CONFIG.serverDir, 'eula.txt'), 'eula=true\n');
+      addLog(`--- Quilt ${version} ready --- using quilt-server-launch.jar ---`, 'system');
+      downloadState.done = true;
+      broadcast({ type: 'download', ...downloadState });
+      broadcast({ type: 'jarReady' });
+      broadcast({ type: 'config', config: CONFIG });
+      return;
     } else if (type === 'forge') {
       // version string is like "1.21.1 - 47.3.0 (recommended)"
       const mcVerMatch = version.match(/^([0-9.]+)/);
@@ -570,35 +693,18 @@ app.post('/api/download', async (req, res) => {
       const instPath = path.join(CONFIG.serverDir, `forge-${mcVer}-${forgeVer}-installer.jar`);
 
       addLog(`--- Downloading Forge ${mcVer}-${forgeVer} installer... ---`, 'system');
-      await new Promise((resolve, reject) => {
-        const doGetForge = (url, depth = 0) => {
-          if (depth > 5) return reject(new Error('Too many redirects'));
-          const mod = url.startsWith('https') ? https : http;
-          mod.get(url, { headers: { 'User-Agent': 'DroidMC/2.0' } }, response => {
-            if (response.statusCode >= 300 && response.headers.location) return doGetForge(response.headers.location, depth + 1);
-            if (response.statusCode !== 200) return reject(new Error(`HTTP ${response.statusCode}`));
-            downloadState.total = parseInt(response.headers['content-length'] || '0');
-            let received = 0;
-            const out = fs.createWriteStream(instPath);
-            response.on('data', chunk => { received += chunk.length; downloadState.progress = received; broadcast({ type: 'download', ...downloadState }); });
-            response.pipe(out);
-            out.on('finish', resolve); out.on('error', reject); response.on('error', reject);
-          }).on('error', reject);
-        };
-        doGetForge(forgeInstallerUrl);
-      });
+      await downloadFileWithProgress(forgeInstallerUrl, instPath);
 
       addLog('--- Running Forge installer (this downloads MC libraries, may take a while)... ---', 'system');
       downloadState.name = `forge-${mcVer}-${forgeVer} (installing...)`;
       broadcast({ type: 'download', ...downloadState });
 
-      await new Promise((resolve, reject) => {
-        const inst = spawn(CONFIG.javaPath, ['-jar', instPath, '--installServer'], { cwd: CONFIG.serverDir });
-        inst.stdout.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'system'); }));
-        inst.stderr.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'warn'); }));
-        inst.on('exit', code => code === 0 ? resolve() : reject(new Error(`Forge installer exited ${code}`)));
-        inst.on('error', reject);
-      });
+      await runLoggedProcess(
+        CONFIG.javaPath,
+        ['-jar', instPath, '--installServer'],
+        CONFIG.serverDir,
+        'Forge installer'
+      );
 
       try { fs.unlinkSync(instPath); } catch {}
       // Forge creates a run.sh or @libraries/net/... shim — use the shim jar
@@ -614,6 +720,40 @@ app.post('/api/download', async (req, res) => {
       saveConfig();
       fs.writeFileSync(path.join(CONFIG.serverDir, 'eula.txt'), 'eula=true\n');
       addLog(`--- Forge ${mcVer}-${forgeVer} ready --- using ${jarToUse} ---`, 'system');
+      downloadState.done = true;
+      broadcast({ type: 'download', ...downloadState });
+      broadcast({ type: 'jarReady' });
+      broadcast({ type: 'config', config: CONFIG });
+      return;
+    } else if (type === 'neoforge') {
+      const neoInstallerUrl = `https://maven.neoforged.net/releases/net/neoforged/neoforge/${version}/neoforge-${version}-installer.jar`;
+      const instPath = path.join(CONFIG.serverDir, `neoforge-${version}-installer.jar`);
+
+      addLog(`--- Downloading NeoForge ${version} installer... ---`, 'system');
+      await downloadFileWithProgress(neoInstallerUrl, instPath);
+
+      addLog('--- Running NeoForge installer (this downloads MC libraries, may take a while)... ---', 'system');
+      downloadState.name = `neoforge-${version} (installing...)`;
+      broadcast({ type: 'download', ...downloadState });
+
+      await runLoggedProcess(
+        CONFIG.javaPath,
+        ['-jar', instPath, '--installServer', '.', '--serverJar'],
+        CONFIG.serverDir,
+        'NeoForge installer'
+      );
+
+      try { fs.unlinkSync(instPath); } catch {}
+      const neoServerJar = ['server.jar', `neoforge-${version}-server.jar`]
+        .find(file => fs.existsSync(path.join(CONFIG.serverDir, file)));
+      if (!neoServerJar) throw new Error('NeoForge installed but no server starter jar was found');
+
+      CONFIG.serverJar = neoServerJar;
+      CONFIG.serverType = 'neoforge';
+      CONFIG.serverVersion = version;
+      saveConfig();
+      fs.writeFileSync(path.join(CONFIG.serverDir, 'eula.txt'), 'eula=true\n');
+      addLog(`--- NeoForge ${version} ready --- using ${neoServerJar} ---`, 'system');
       downloadState.done = true;
       broadcast({ type: 'download', ...downloadState });
       broadcast({ type: 'jarReady' });

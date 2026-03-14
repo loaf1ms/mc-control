@@ -77,6 +77,40 @@
         </button>
         <button
           class="hbtn hbtn-ghost"
+          id="btnStopTop"
+          onclick="srvAct('stop')"
+          disabled
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect
+              x="3"
+              y="3"
+              width="8"
+              height="8"
+              rx="1.5"
+              fill="currentColor"
+            />
+          </svg>
+          Stop
+        </button>
+        <button
+          class="hbtn hbtn-danger"
+          id="btnKillTop"
+          onclick="killSrv()"
+          disabled
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path
+              d="M3 3l8 8M11 3l-8 8"
+              stroke="currentColor"
+              stroke-width="1.7"
+              stroke-linecap="round"
+            />
+          </svg>
+          Kill
+        </button>
+        <button
+          class="hbtn hbtn-ghost"
           onclick="srvAct('restart')"
           id="btnRestart"
         >
@@ -366,10 +400,14 @@
                 </div>
                 <span class="stat-label">Disk</span>
               </div>
-              <div class="stat-value">0 B</div>
-              <div class="stat-sub">of 10 GB (0.0%)</div>
+              <div class="stat-value" id="dDisk">0 B</div>
+              <div class="stat-sub" id="diskSub">of 0 B (0.0%)</div>
               <div class="stat-bar">
-                <div class="stat-bar-fill disk" style="width: 0%"></div>
+                <div
+                  class="stat-bar-fill disk"
+                  id="diskBar"
+                  style="width: 0%"
+                ></div>
               </div>
             </div>
 
@@ -408,12 +446,13 @@
             <!-- Server Plan -->
             <div class="panel plan-panel">
               <div class="plan-header">
-                <div class="plan-icon-lg"><span>🦇</span></div>
                 <div class="plan-header-info">
                   <div class="plan-name-lg">
-                    Bat <span class="plan-tag">Auto-Sleep</span>
+                    Server <span class="plan-tag">Overview</span>
                   </div>
-                  <div class="plan-header-sub">Your current server plan</div>
+                  <div class="plan-header-sub">
+                    Current server status and resources
+                  </div>
                 </div>
                 <div
                   id="statusBadge2"
@@ -958,6 +997,20 @@ A DroidMC Minecraft Server</textarea
                 <div class="vtb" data-type="forge" onclick="selType('forge')">
                   <span class="vi">🔨</span>
                   <div class="vn">Forge</div>
+                  <div class="vs">Modloader</div>
+                </div>
+                <div
+                  class="vtb"
+                  data-type="neoforge"
+                  onclick="selType('neoforge')"
+                >
+                  <span class="vi">NF</span>
+                  <div class="vn">NeoForge</div>
+                  <div class="vs">Modloader</div>
+                </div>
+                <div class="vtb" data-type="quilt" onclick="selType('quilt')">
+                  <span class="vi">Q</span>
+                  <div class="vn">Quilt</div>
                   <div class="vs">Modloader</div>
                 </div>
               </div>

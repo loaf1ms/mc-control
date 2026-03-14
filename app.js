@@ -1,4 +1,4 @@
-let ws,isRunning=false,curF='all',allLogs=[],players=[],selT='paper',propsData={},networkInfo={lanIp:'',addresses:[]};
+let ws,isRunning=false,curF='all',allLogs=[],players=[],selT='paper',propsData={},networkInfo={lanIp:'',addresses:[]},configState={memory:'1G',serverDir:''},lastStats={cpu:0,ram:0,diskUsed:0,diskTotal:0};
 
 function connect(){
   const p=location.protocol==='https:'?'wss':'ws';
@@ -14,7 +14,7 @@ function handle(m){
   else if(m.type==='players') setPl(m.players);
   else if(m.type==='uptime')  setUp(m.uptime);
   else if(m.type==='config')  apCfg(m.config);
-  else if(m.type==='stats')  updStats(m);
+  else if(m.type==='stats'){lastStats={...lastStats,...m};updStats(m);}
   else if(m.type==='download') updDl(m);
   else if(m.type==='jarReady'){toast('Download done! Ready to start.','ok');loadVI();}
 }
@@ -86,17 +86,21 @@ function setR(r){
   // Buttons
   const bStart=document.getElementById('btnStart');
   const bRestart=document.getElementById('btnRestart');
+  const bStopTop=document.getElementById('btnStopTop');
+  const bKillTop=document.getElementById('btnKillTop');
   const bStartMain=document.getElementById('btnStartMain');
   const bStop=document.getElementById('btnStop');
   const bKill=document.getElementById('btnKill');
   if(bStart)bStart.disabled=r;
   if(bRestart)bRestart.disabled=!r;
+  if(bStopTop)bStopTop.disabled=!r;
+  if(bKillTop)bKillTop.disabled=!r;
   if(bStartMain)bStartMain.disabled=r;
   if(bStop)bStop.disabled=!r;
   if(bKill)bKill.disabled=!r;
   document.getElementById('cmdi').disabled=!r;
   document.getElementById('bSend').disabled=!r;
-  if(!r){setUp(null);setPl([]);}
+  if(!r){setUp(null);setPl([]);updStats({...lastStats,cpu:0,ram:0});}
 }
 
 function setPl(list){
@@ -131,32 +135,59 @@ function setUp(u){
   if(planUpSub)planUpSub.textContent=u?'running':'Not running';
 }
 
+function parseMemoryToMB(value){
+  const match=String(value||'').trim().toUpperCase().match(/^(\d+(?:\.\d+)?)([KMGTP])?B?$/);
+  if(!match)return 0;
+  const amount=Number(match[1]);
+  const unit=match[2]||'M';
+  const mult={K:1/1024,M:1,G:1024,T:1048576,P:1073741824}[unit]||1;
+  return amount*mult;
+}
+
+function getMemoryLimitMB(){
+  const input=document.getElementById('sRam');
+  const raw=(input&&input.value.trim())||configState.memory||'';
+  return parseMemoryToMB(raw);
+}
+
 function updStats(s){
   // s.cpu = process CPU % (from pidusage), s.ram = process RAM in MB (from pidusage)
   const cpu=Number(s.cpu)||0;
   const ramMB=Number(s.ram)||0;  // now MB from pidusage
-  const ramPct=Math.min(ramMB/4096*100,100); // assume 4GB allocation for bar
+  const ramLimitMB=getMemoryLimitMB();
+  const ramPct=ramLimitMB>0?Math.min(ramMB/ramLimitMB*100,100):0;
+  const diskUsed=Number(s.diskUsed)||0;
+  const diskTotal=Number(s.diskTotal)||0;
+  const diskPct=diskTotal>0?Math.min(diskUsed/diskTotal*100,100):0;
   const cpuCol=cpu>70?'var(--red)':cpu>40?'var(--amber)':'var(--green)';
   const ramCol=ramPct>80?'var(--red)':ramPct>60?'var(--amber)':'var(--green)';
+  const diskCol=diskPct>90?'var(--red)':diskPct>75?'var(--amber)':'var(--blue)';
   const cpuTxt=cpu%1===0?cpu.toFixed(0):cpu.toFixed(1);
   const ramTxt=ramMB>=1024?(ramMB/1024).toFixed(1)+' GB':ramMB.toFixed(0)+' MB';
+  const ramLimitTxt=ramLimitMB>0?fmtB(ramLimitMB*1024*1024):'â”€';
   // Top stat cards
   const cpuEl=document.getElementById('dCpu');
   const ramEl=document.getElementById('dRam');
+  const diskEl=document.getElementById('dDisk');
   if(cpuEl){cpuEl.textContent=cpuTxt+'%';cpuEl.style.color=cpuCol;}
   if(ramEl){ramEl.textContent=ramTxt;ramEl.style.color=ramCol;}
+  if(diskEl){diskEl.textContent=fmtB(diskUsed);diskEl.style.color=diskCol;}
   document.getElementById('tCpu').textContent=cpuTxt+'%';
   document.getElementById('tRam').textContent=ramTxt;
   // Stat card bars
   const cpuBar=document.getElementById('cpuBar');
   const ramBar=document.getElementById('ramBar');
+  const diskBar=document.getElementById('diskBar');
   if(cpuBar){cpuBar.style.width=Math.min(cpu/2,100)+'%';cpuBar.style.background=cpuCol;}
   if(ramBar){ramBar.style.width=ramPct+'%';ramBar.style.background=ramCol;}
+  if(diskBar){diskBar.style.width=diskPct+'%';diskBar.style.background=diskCol;}
   // Sub labels
   const cpuSub=document.getElementById('cpuSub');
   const ramSub=document.getElementById('ramSub');
+  const diskSub=document.getElementById('diskSub');
   if(cpuSub)cpuSub.textContent='of 200% max';
-  if(ramSub)ramSub.textContent='of 4 GB ('+ramPct.toFixed(1)+'%)';
+  if(ramSub)ramSub.textContent=ramLimitMB>0?'of '+ramLimitTxt+' ('+ramPct.toFixed(1)+'%)':'Memory limit unavailable';
+  if(diskSub)diskSub.textContent=diskTotal>0?'of '+fmtB(diskTotal)+' ('+diskPct.toFixed(1)+'%)':'Storage unavailable';
   // Plan panel mini cards
   const planCpu=document.getElementById('planCpu');
   const planRam=document.getElementById('planRam');
@@ -167,11 +198,12 @@ function updStats(s){
   if(planRam){planRam.textContent=ramTxt;planRam.style.color=ramCol;}
   if(planCpuBar){planCpuBar.style.width=Math.min(cpu/2,100)+'%';planCpuBar.style.background=cpuCol;}
   if(planRamBar){planRamBar.style.width=ramPct+'%';planRamBar.style.background=ramCol;}
-  if(planRamSub)planRamSub.textContent='of 4 GB ('+ramPct.toFixed(1)+'%)';
+  if(planRamSub)planRamSub.textContent=ramLimitMB>0?'of '+ramLimitTxt+' ('+ramPct.toFixed(1)+'%)':'Memory limit unavailable';
 }
 
 function apCfg(c){
   if(!c)return;
+  configState={...configState,...c};
   document.getElementById('sRam').value=c.memory||'';
   document.getElementById('sJar').value=c.serverJar||'';
   document.getElementById('sDir').value=c.serverDir||'';
@@ -187,6 +219,7 @@ function apCfg(c){
   const planVer=document.getElementById('planVer');
   if(planType&&c.serverType)planType.textContent=c.serverType.charAt(0).toUpperCase()+c.serverType.slice(1);
   if(planVer&&c.serverVersion)planVer.textContent=c.serverVersion;
+  updStats(lastStats);
 }
 
 function apNetwork(network,config){
