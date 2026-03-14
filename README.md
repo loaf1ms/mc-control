@@ -43,7 +43,7 @@ Or on the same device: `http://localhost:8080`
 - **Player management** — Kick, ban, unban, OP, gamemode, teleport, heal, feed
 - **Plugins & Mods** — Upload and delete `.jar` files
 - **Properties editor** — Edit `server.properties` from the browser
-- **System stats** — Live CPU(broken at the moment) and RAM usage with ring gauges
+- **System stats** — Live CPU(broken at the moment but likely will be fixed next) and RAM usage with ring gauges
 - **How to Connect card** — Shows your IP, port, server type and version at a glance
 
 ---
