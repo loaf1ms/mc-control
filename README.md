@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/loaf1ms/DroidMC/main/setup.sh -o se
 bash setup.sh
 ```
 
-The script will walk you through setup and configure everything automatically.
+The script will walk you through setup and configure everything automatically. It will detect your phone's available RAM and suggest a sensible allocation for the server.
 
 Then start the panel:
 
@@ -35,6 +35,30 @@ Or on the same device: `http://localhost:8080`
 
 ---
 
+## Update
+
+To pull the latest panel files without touching your world data:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/loaf1ms/DroidMC/main/update.sh -o update.sh
+bash update.sh
+```
+
+The update script backs up your current panel files before downloading, verifies checksums, and automatically restores your backup if anything goes wrong. It will also offer to restart the server once the update is applied.
+
+---
+
+## Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/loaf1ms/DroidMC/main/uninstall.sh -o uninstall.sh
+bash uninstall.sh
+```
+
+You'll be asked whether to keep or delete your world data, and given a final confirmation before anything is removed.
+
+---
+
 ## Features
 
 - **Server control** — Start, stop, force kill
@@ -43,7 +67,7 @@ Or on the same device: `http://localhost:8080`
 - **Player management** — Kick, ban, unban, OP, gamemode, teleport, heal, feed
 - **Plugins & Mods** — Upload and delete `.jar` files
 - **Properties editor** — Edit `server.properties` from the browser
-- **System stats** — Live CPU(broken at the moment) and RAM usage with ring gauges
+- **System stats** — Live CPU *(broken at the moment)* and RAM usage with ring gauges
 - **How to Connect card** — Shows your IP, port, server type and version at a glance
 
 ---
@@ -61,7 +85,7 @@ The setup script automatically installs OpenJDK 21, Node.js, and tmux.
 
 - Keep your phone **plugged in** while the server runs — Java is heavy on battery
 - Run `termux-wake-lock` (requires Termux:API from F-Droid) to prevent Android from killing the server
-- Use **Paper** over Vanilla or fabric for much better performance on ARM
+- Use **Paper** over Vanilla or Fabric for much better performance on ARM
 - Set `view-distance=6` in Properties if the server feels slow
 
 ---
@@ -73,6 +97,8 @@ The setup script automatically installs OpenJDK 21, Node.js, and tmux.
 ├── server.js          ← Backend & API
 ├── package.json       ← Node dependencies
 ├── config.json        ← Saved settings
+├── .version           ← Installed version (used by update/setup scripts)
+├── .backup/           ← Pre-update backup of panel files
 ├── node_modules/      ← Installed packages
 └── public/
     ├── index.html     ← UI layout

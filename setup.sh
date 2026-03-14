@@ -33,10 +33,29 @@ if [ ! -d "/data/data/com.termux" ]; then
   [[ "$cont" != "y" && "$cont" != "Y" ]] && exit 1
 fi
 
-step "Downloading DroidMC files"
-
+DROIDMC_VERSION="2.1.0"
 REPO_RAW="https://raw.githubusercontent.com/loaf1ms/DroidMC/main"
 UI_DIR_EARLY="$HOME/DroidMC"
+
+# ── Version / existing install check ────────────────────────────────────────
+if [ -f "$UI_DIR_EARLY/.version" ]; then
+  INSTALLED_VER="$(cat "$UI_DIR_EARLY/.version")"
+  echo ""
+  echo -e "  ${A}DroidMC $INSTALLED_VER is already installed.${N}"
+  echo ""
+  echo -e "  ${D}[1]${N} Reinstall (overwrite panel files, keep world data)"
+  echo -e "  ${D}[2]${N} Cancel"
+  echo ""
+  read -p "  Choice [1/2]: " install_choice
+  if [[ "$install_choice" != "1" ]]; then
+    info "Cancelled. Run ~/start-mc.sh to launch, or update.sh to update."
+    exit 0
+  fi
+  warn "Reinstalling DroidMC $DROIDMC_VERSION over $INSTALLED_VER..."
+fi
+
+step "Downloading DroidMC files"
+
 mkdir -p "$UI_DIR_EARLY/public"
 
 info "Downloading server.js..."
@@ -48,6 +67,33 @@ curl -fsSL "$REPO_RAW/index.html" -o "$UI_DIR_EARLY/public/index.html" || err "F
 curl -fsSL "$REPO_RAW/style.css" -o "$UI_DIR_EARLY/public/style.css" || err "Failed to download style.css"
 curl -fsSL "$REPO_RAW/app.js" -o "$UI_DIR_EARLY/public/app.js" || err "Failed to download app.js"
 log "Files downloaded to ~/DroidMC/"
+
+# ── Checksum verification ────────────────────────────────────────────────────
+info "Verifying file integrity..."
+CHECKSUM_FILE="$UI_DIR_EARLY/.checksums"
+curl -fsSL "$REPO_RAW/checksums.sha256" -o "$CHECKSUM_FILE" 2>/dev/null || {
+  warn "checksums.sha256 not found in repo — skipping verification."
+  CHECKSUM_FILE=""
+}
+
+if [ -n "$CHECKSUM_FILE" ] && command -v sha256sum >/dev/null 2>&1; then
+  FAIL=0
+  while IFS="  " read -r expected_hash filename; do
+    [ -z "$filename" ] && continue
+    filepath="$UI_DIR_EARLY/$filename"
+    actual_hash="$(sha256sum "$filepath" 2>/dev/null | awk '{print $1}')"
+    if [ "$actual_hash" != "$expected_hash" ]; then
+      warn "Checksum mismatch: $filename"
+      FAIL=1
+    fi
+  done < "$CHECKSUM_FILE"
+  if [ "$FAIL" -eq 1 ]; then
+    err "One or more files failed verification. The download may be corrupted. Aborting."
+  fi
+  log "All files verified OK"
+else
+  [ -z "$CHECKSUM_FILE" ] || warn "sha256sum not available — skipping verification."
+fi
 
 step "Step 1/5 - Installing packages"
 
@@ -88,8 +134,28 @@ else
   info "Skipping tmux"
 fi
 
-MC_RAM="2G"
-log "Server RAM defaulted to 2G"
+# ── RAM prompt ───────────────────────────────────────────────────────────────
+TOTAL_MB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print int($2/1024)}')
+if [ -n "$TOTAL_MB" ] && [ "$TOTAL_MB" -gt 0 ]; then
+  SUGGESTED_MB=$((TOTAL_MB / 2))
+  SUGGESTED_MB=$(( (SUGGESTED_MB / 512) * 512 ))
+  [ "$SUGGESTED_MB" -lt 512 ] && SUGGESTED_MB=512
+  SUGGESTED="${SUGGESTED_MB}M"
+  info "Detected ${TOTAL_MB}MB total RAM. Suggested allocation: ${SUGGESTED}"
+else
+  SUGGESTED="1G"
+  info "Could not detect RAM. Suggested default: $SUGGESTED"
+fi
+echo ""
+read -p "  How much RAM for the Minecraft server? [default: $SUGGESTED]: " ram_input
+ram_input="${ram_input:-$SUGGESTED}"
+if [[ "$ram_input" =~ ^[0-9]+[MmGg]$ ]]; then
+  MC_RAM="${ram_input^^}"
+  log "Server RAM set to $MC_RAM"
+else
+  warn "Invalid format '$ram_input', falling back to $SUGGESTED"
+  MC_RAM="${SUGGESTED^^}"
+fi
 
 step "Step 3/5 - Setting up directories"
 
@@ -145,6 +211,10 @@ step "Step 4/5 - Installing Node.js dependencies"
 cd "$UI_DIR"
 npm install
 log "express + ws installed"
+
+# Write version marker
+echo "$DROIDMC_VERSION" > "$UI_DIR/.version"
+log "Version $DROIDMC_VERSION recorded"
 
 step "Step 5/5 - Creating launch scripts"
 
@@ -214,4 +284,21 @@ echo ""
 echo -e "${G}==============================================${N}"
 echo -e "${G}  Setup complete${N}"
 echo -e "${G}==============================================${N}"
+echo ""
+echo -e "  ${D}Start the panel:${N}"
+echo -e "    ${G}~/start-mc.sh${N}"
+if command -v tmux >/dev/null 2>&1; then
+  echo -e "    ${G}~/start-mc-bg.sh${N} ${D}(recommended)${N}"
+fi
+echo ""
+echo -e "  ${D}Open in your browser:${N}"
+echo -e "    ${G}http://localhost:8080${N}"
+echo ""
+LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+if [ -n "$LOCAL_IP" ]; then
+  echo -e "  ${D}LAN address:${N}"
+  echo -e "    ${G}$LOCAL_IP${N}"
+  echo ""
+fi
+echo -e "  ${A}Keep your phone plugged in while the server runs.${N}"
 echo ""
