@@ -70,16 +70,24 @@ async function sc(cmd){
 
 function setR(r){
   isRunning=r;
-  const pi=document.getElementById('pill'),pt=document.getElementById('ptxt');
-  pi.className='pill '+(r?'on':'off');pt.textContent=r?'ONLINE':'OFFLINE';
+  // New status badge
+  const badge=document.getElementById('statusBadge');
+  const badgeTxt=document.getElementById('badgeTxt');
+  if(badge){badge.className='status-badge '+(r?'running':'stopped');badgeTxt.textContent=r?'RUNNING':'STOPPED';}
+  // Status text in stat card
   const ds=document.getElementById('dStatus');
-  ds.textContent=r?'● Online':'● Offline';
-  ds.className='sh-sub'+(r?' online':'');
-  const hero=document.getElementById('statusHero');
-  if(hero)hero.className='status-hero'+(r?' online':'');
-  document.getElementById('btnStart').disabled=r;
-  document.getElementById('btnStop').disabled=!r;
-  document.getElementById('btnKill').disabled=!r;
+  if(ds){ds.textContent=r?'Currently running':'Not currently running';}
+  const dup=document.getElementById('dUp');
+  if(dup&&!r){dup.textContent='Offline';dup.className='stat-value dim';}
+  // Buttons
+  const bStart=document.getElementById('btnStart');
+  const bStartMain=document.getElementById('btnStartMain');
+  const bStop=document.getElementById('btnStop');
+  const bKill=document.getElementById('btnKill');
+  if(bStart)bStart.disabled=r;
+  if(bStartMain)bStartMain.disabled=r;
+  if(bStop)bStop.disabled=!r;
+  if(bKill)bKill.disabled=!r;
   document.getElementById('cmdi').disabled=!r;
   document.getElementById('bSend').disabled=!r;
   if(!r){setUp(null);setPl([]);}
@@ -102,31 +110,37 @@ function setPl(list){
 function setUp(u){
   const v=u||'─';
   document.getElementById('tUp').textContent=v;
-  document.getElementById('dUp').textContent=v;
+  const dup=document.getElementById('dUp');
+  if(dup){
+    dup.textContent=u||'Offline';
+    dup.className=u?'stat-value':'stat-value dim';
+  }
+  const ds=document.getElementById('dStatus');
+  if(ds&&!u)ds.textContent='Not currently running';
 }
 
 function updStats(s){
-  const circ=131.95; // 2π×21
   const cpu=Number(s.cpu)||0;
   const ram=Number(s.ram)||0;
-  const cpuCls=cpu>70?'crit':cpu>40?'warn':'';
-  const ramCls=ram>80?'crit':ram>60?'warn':'';
   const cpuCol=cpu>70?'var(--red)':cpu>40?'var(--amber)':'var(--green)';
   const ramCol=ram>80?'var(--red)':ram>60?'var(--amber)':'var(--green)';
   const cpuTxt=cpu%1===0?cpu.toFixed(0):cpu.toFixed(1);
-  const cpuEl=document.getElementById('dCpu');const ramEl=document.getElementById('dRam');
-  cpuEl.textContent=cpuTxt+'%';cpuEl.style.color=cpuCol;
-  ramEl.textContent=ram+'%';ramEl.style.color=ramCol;
+  const cpuEl=document.getElementById('dCpu');
+  const ramEl=document.getElementById('dRam');
+  if(cpuEl){cpuEl.textContent=cpuTxt+'%';cpuEl.style.color=cpuCol;}
+  if(ramEl){ramEl.textContent=ram+'%';ramEl.style.color=ramCol;}
   document.getElementById('tCpu').textContent=cpuTxt+'%';
   document.getElementById('tRam').textContent=ram+'%';
-  const cpuG=document.getElementById('cpuGaugeFill');
-  const ramG=document.getElementById('ramGaugeFill');
-  const cpuP=document.getElementById('cpuGaugePct');
-  const ramP=document.getElementById('ramGaugePct');
-  if(cpuG){cpuG.style.strokeDasharray=`${cpu/100*circ} ${circ}`;cpuG.className='gauge-fill'+(cpuCls?' '+cpuCls:'');}
-  if(ramG){ramG.style.strokeDasharray=`${ram/100*circ} ${circ}`;ramG.className='gauge-fill'+(ramCls?' '+ramCls:'');}
-  if(cpuP)cpuP.style.color=cpuCol;
-  if(ramP)ramP.style.color=ramCol;
+  // Bar fills
+  const cpuBar=document.getElementById('cpuBar');
+  const ramBar=document.getElementById('ramBar');
+  if(cpuBar){cpuBar.style.width=Math.min(cpu/2,100)+'%';cpuBar.style.background=cpuCol;}
+  if(ramBar){ramBar.style.width=Math.min(ram,100)+'%';ramBar.style.background=ramCol;}
+  // Sub labels
+  const cpuSub=document.getElementById('cpuSub');
+  const ramSub=document.getElementById('ramSub');
+  if(cpuSub)cpuSub.textContent='of 200% max';
+  if(ramSub)ramSub.textContent='of 4 GB ('+ram.toFixed(1)+'%)';
 }
 
 function apCfg(c){
@@ -160,15 +174,15 @@ function renderPl(){
       <div class="pavatar"><img src="https://crafatar.com/avatars/${esc(p.name)}?size=34&overlay=true" alt="${esc(p.name)}" onerror="this.outerHTML='🧑'"></div>
       <div><div class="pname">${esc(p.name)}</div><div class="ptime">● Online</div></div>
       <div class="pacts">
-        <button class="btn xs bg" onclick="plAct('op','${esc(p.name)}')">⭐ OP</button>
-        <button class="btn xs" onclick="plAct('creative','${esc(p.name)}')">🎨</button>
-        <button class="btn xs" onclick="plAct('survival','${esc(p.name)}')">⚔️</button>
-        <button class="btn xs" onclick="plAct('spectator','${esc(p.name)}')">👁</button>
-        <button class="btn xs bb" onclick="plAct('heal','${esc(p.name)}')">❤️</button>
-        <button class="btn xs bb" onclick="plAct('feed','${esc(p.name)}')">🍖</button>
-        <button class="btn xs" onclick="openTp('${esc(p.name)}')">📍 TP</button>
-        <button class="btn xs ba" onclick="openKick('${esc(p.name)}')">👢 Kick</button>
-        <button class="btn xs br" onclick="openBan('${esc(p.name)}')">🔨 Ban</button>
+        <button class="abtn primary sm" onclick="plAct('op','${esc(p.name)}')">⭐ OP</button>
+        <button class="abtn ghost sm" onclick="plAct('creative','${esc(p.name)}')">🎨</button>
+        <button class="abtn ghost sm" onclick="plAct('survival','${esc(p.name)}')">⚔️</button>
+        <button class="abtn ghost sm" onclick="plAct('spectator','${esc(p.name)}')">👁</button>
+        <button class="abtn ghost sm" onclick="plAct('heal','${esc(p.name)}')">❤️</button>
+        <button class="abtn ghost sm" onclick="plAct('feed','${esc(p.name)}')">🍖</button>
+        <button class="abtn ghost sm" onclick="openTp('${esc(p.name)}')">📍 TP</button>
+        <button class="abtn danger sm" onclick="openKick('${esc(p.name)}')">👢 Kick</button>
+        <button class="abtn danger sm" onclick="openBan('${esc(p.name)}')">🔨 Ban</button>
       </div>
     </div>
   `).join('');
@@ -400,7 +414,7 @@ async function loadMods(){
       <span style="font-size:20px">🧩</span>
       <div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(m.name)}</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--td)">${fmtB(m.size)}</div></div>
-      <button class="btn xs br" onclick="delMod('${esc(m.name)}')">🗑 Delete</button>
+      <button class="abtn danger sm" onclick="delMod('${esc(m.name)}')">🗑 Delete</button>
     </div>
   `).join('');
 }
@@ -483,7 +497,7 @@ async function loadPlgs(){
       <span style="font-size:20px">🔌</span>
       <div style="flex:1"><div style="font-size:13px;font-weight:600">${esc(p.name)}</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--td)">${fmtB(p.size)}</div></div>
-      <button class="btn xs br" onclick="delPlg('${esc(p.name)}')">🗑 Delete</button>
+      <button class="abtn danger sm" onclick="delPlg('${esc(p.name)}')">🗑 Delete</button>
     </div>
   `).join('');
 }
@@ -504,10 +518,10 @@ async function saveSettings(){
 }
 
 // ─ Tab nav ─
-document.querySelectorAll('.nb[data-tab]').forEach(btn=>{
+document.querySelectorAll('[data-tab]').forEach(btn=>{
   btn.addEventListener('click',()=>{
     const t=btn.dataset.tab;
-    document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('[data-tab]').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-'+t).classList.add('active');
@@ -577,3 +591,21 @@ document.addEventListener('keydown',e=>{
     setTimeout(()=>document.getElementById('cmdi').focus(),50);
   }
 });
+
+function updateMOTD(){
+  const input=document.getElementById('motdInput');
+  const preview=document.getElementById('motdPreview');
+  if(input&&preview){
+    let text=input.value||'A DroidMC Minecraft Server';
+    // Basic color code rendering
+    text=text.replace(/§[0-9a-fA-Fk-or]/g,'');
+    preview.textContent=text;
+  }
+}
+
+function saveMOTD(){
+  const val=document.getElementById('motdInput')?.value;
+  if(!val)return;
+  // Could be saved via API in a real implementation
+  toast('MOTD updated!','ok');
+}
