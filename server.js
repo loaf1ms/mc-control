@@ -6,7 +6,7 @@
 
 const express  = require('express');
 const { WebSocketServer } = require('ws');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const https    = require('https');
 const http     = require('http');
 const fs       = require('fs');
@@ -65,6 +65,76 @@ function broadcast(data) {
 }
 
 let _prevCpu = null;
+let _rootAccess = null;
+let _clockTicks = null;
+let _prevRootProc = null;
+
+function hasRootAccess() {
+  if (_rootAccess != null) return _rootAccess;
+  try {
+    const uid = execFileSync('su', ['-c', 'id -u'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    _rootAccess = uid === '0';
+  } catch {
+    _rootAccess = false;
+  }
+  return _rootAccess;
+}
+
+function getClockTicksPerSecond() {
+  if (_clockTicks != null) return _clockTicks;
+  try {
+    const value = Number(execFileSync('getconf', ['CLK_TCK'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim());
+    _clockTicks = Number.isFinite(value) && value > 0 ? value : 100;
+  } catch {
+    _clockTicks = 100;
+  }
+  return _clockTicks;
+}
+
+function readRootFile(filePath) {
+  return execFileSync('su', ['-c', `cat ${filePath}`], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+}
+
+function readRootProcessStats(pid) {
+  try {
+    const statText = readRootFile(`/proc/${pid}/stat`).trim();
+    const statusText = readRootFile(`/proc/${pid}/status`);
+    const uptimeText = readRootFile('/proc/uptime').trim();
+    const statFields = statText.slice(statText.lastIndexOf(')') + 2).split(/\s+/);
+    const totalTicks = Number(statFields[11] || 0) + Number(statFields[12] || 0);
+    const uptimeSeconds = Number(uptimeText.split(/\s+/)[0] || 0);
+    const rssMatch = statusText.match(/^VmRSS:\s+(\d+)\s+kB$/m);
+    const ram = rssMatch ? Number(rssMatch[1]) / 1024 : 0;
+
+    let cpu = 0;
+    if (_prevRootProc && _prevRootProc.pid === pid) {
+      const deltaTicks = totalTicks - _prevRootProc.totalTicks;
+      const deltaUptime = uptimeSeconds - _prevRootProc.uptimeSeconds;
+      if (deltaTicks >= 0 && deltaUptime > 0) {
+        cpu = deltaTicks / getClockTicksPerSecond() / deltaUptime * 100;
+      }
+    }
+
+    _prevRootProc = { pid, totalTicks, uptimeSeconds };
+    return {
+      cpu: Math.max(0, Math.round(cpu * 10) / 10),
+      ram: Math.max(0, Math.round(ram * 10) / 10),
+    };
+  } catch {
+    _prevRootProc = null;
+    return null;
+  }
+}
+
 function readCpuTimes() {
   try {
     const stat = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0];
@@ -116,6 +186,15 @@ function updateDiskStats() {
 
 function updateSystemStats() {
   updateDiskStats();
+  if (mcProcess && mcProcess.pid && hasRootAccess()) {
+    const rootStats = readRootProcessStats(mcProcess.pid);
+    if (rootStats) {
+      systemStats = { ...systemStats, ...rootStats };
+      broadcast({ type: 'stats', ...systemStats });
+      return;
+    }
+  }
+
   // If pidusage is available and MC is running, use process-level stats
   if (mcProcess && mcProcess.pid && pidusage) {
     pidusage(mcProcess.pid, (err, stats) => {
@@ -136,6 +215,7 @@ function updateSystemStats() {
     broadcast({ type: 'stats', ...systemStats });
   } else {
     systemStats = { ...systemStats, cpu: 0, ram: 0 };
+    _prevRootProc = null;
     broadcast({ type: 'stats', ...systemStats });
   }
 }
