@@ -340,14 +340,27 @@ async function loadVerList(){
 async function dlVer(){
   const ver=document.getElementById('verSel').value;
   if(!ver||ver.includes('Loading')||ver.includes('Error')){toast('Pick a version','err');return;}
+  const sameType=(configState.serverType||'')===selT;
+  const sameVersion=(configState.serverVersion||'')===ver;
+  let force=false;
+  if(sameType&&sameVersion){
+    force=confirm(`You already have ${selT} ${ver}. Redownload it?`);
+    if(!force)return;
+  }
   document.getElementById('bDl').disabled=true;
   const prog=document.getElementById('dlProg');prog.classList.add('vis');
   document.getElementById('pbf').style.width='0';document.getElementById('pbf').className='pbfill';
   document.getElementById('dlPct').textContent='0%';
   document.getElementById('dlName').textContent='Downloading '+selT+' '+ver+'...';
   document.getElementById('dlSub').textContent='';
-  const r=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:selT,version:ver})});
-  const d=await r.json();if(d.error){toast(d.error,'err');document.getElementById('bDl').disabled=false;}
+  const r=await fetch('/api/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:selT,version:ver,force})});
+  const d=await r.json();
+  if(d.needsConfirm){
+    document.getElementById('bDl').disabled=false;
+    document.getElementById('dlProg').classList.remove('vis');
+    return;
+  }
+  if(d.error){toast(d.error,'err');document.getElementById('bDl').disabled=false;}
 }
 
 function updDl(d){

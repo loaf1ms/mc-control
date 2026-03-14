@@ -674,7 +674,17 @@ app.post('/api/download', async (req, res) => {
   if (downloadState && !downloadState.done && !downloadState.error)
     return res.json({ error: 'Download already in progress' });
 
-  const { type, version } = req.body;
+  const { type, version, force } = req.body;
+  const sameVersion =
+    String(CONFIG.serverType || '') === String(type || '') &&
+    String(CONFIG.serverVersion || '') === String(version || '');
+
+  if (sameVersion && !force) {
+    return res.json({
+      needsConfirm: true,
+      error: `Same version already installed: ${type} ${version}`,
+    });
+  }
   res.json({ ok: true });
 
   downloadState = { name: `${type}-${version}.jar`, progress: 0, total: 0, done: false, error: null };

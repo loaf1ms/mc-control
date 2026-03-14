@@ -33,7 +33,7 @@ if [ ! -d "/data/data/com.termux" ]; then
   [[ "$cont" != "y" && "$cont" != "Y" ]] && exit 1
 fi
 
-DROIDMC_VERSION="2.3.3"
+DROIDMC_VERSION="2.3.4"
 REPO_RAW="https://raw.githubusercontent.com/loaf1ms/DroidMC/main"
 UI_DIR_EARLY="$HOME/DroidMC"
 
