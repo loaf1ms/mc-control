@@ -85,10 +85,12 @@ function setR(r){
   if(dup&&!r){dup.textContent='Offline';dup.className='stat-value dim';}
   // Buttons
   const bStart=document.getElementById('btnStart');
+  const bRestart=document.getElementById('btnRestart');
   const bStartMain=document.getElementById('btnStartMain');
   const bStop=document.getElementById('btnStop');
   const bKill=document.getElementById('btnKill');
   if(bStart)bStart.disabled=r;
+  if(bRestart)bRestart.disabled=!r;
   if(bStartMain)bStartMain.disabled=r;
   if(bStop)bStop.disabled=!r;
   if(bKill)bKill.disabled=!r;
@@ -247,8 +249,14 @@ function openBcast(){openM('Broadcast','Message all players','Message',async v=>
   if(!v)return;await sc('broadcast '+v);toast('Broadcast sent','ok');
 });}
 
+function getOffPlName(){
+  const input=document.getElementById('offPl');
+  if(!input){toast('Offline player input is unavailable','err');return '';}
+  return input.value.trim();
+}
+
 function offAct(a){
-  const n=document.getElementById('offPl').value.trim();
+  const n=getOffPlName();
   if(!n){toast('Enter a username first','err');return;}
   if(!isRunning){toast('Server not running','err');return;}
   const cmd=a==='unban'?'pardon':a;
@@ -256,18 +264,22 @@ function offAct(a){
 }
 
 function offAct2(a,prompt){
-  const n=document.getElementById('offPl').value.trim();
+  const n=getOffPlName();
   if(!n){toast('Enter a username first','err');return;}
   if(!isRunning){toast('Server not running','err');return;}
   if(prompt){
-    openM(a+' '+n,prompt,'Value',async v=>{if(v)sc(a+' '+n+' '+v);});
+    openM(a+' '+n,prompt,'Value',async v=>{
+      const value=(v||'').trim();
+      if(!value){toast('Enter a value first','err');return;}
+      sc(a+' '+n+' '+value);
+    });
   } else {
     sc(a+' '+n);
   }
 }
 
 function offKick(){
-  const n=document.getElementById('offPl').value.trim();
+  const n=getOffPlName();
   if(!n){toast('Enter a username first','err');return;}
   if(!isRunning){toast('Server not running','err');return;}
   openM('Kick '+n,'Kick reason (optional)','Reason',async v=>{
@@ -277,7 +289,7 @@ function offKick(){
 }
 
 function offBan(){
-  const n=document.getElementById('offPl').value.trim();
+  const n=getOffPlName();
   if(!n){toast('Enter a username first','err');return;}
   if(!isRunning){toast('Server not running','err');return;}
   openM('Ban '+n,'Ban reason','Reason',async v=>{
@@ -287,7 +299,7 @@ function offBan(){
 }
 
 function offPardon(){
-  const n=document.getElementById('offPl').value.trim();
+  const n=getOffPlName();
   if(!n){toast('Enter a username first','err');return;}
   if(!isRunning){toast('Server not running','err');return;}
   sc('pardon '+n);toast('Pardon sent for '+n,'ok');
