@@ -382,7 +382,16 @@ function writeProperties(props) {
 }
 
 // --- Routes -------------------------------------------------------------------
-app.use(express.json());
+app.use(express.json({ limit: '700mb' }));
+
+app.use((err, req, res, next) => {
+  if (!err) return next();
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Upload too large for server limit' });
+  }
+  console.error('[http] request error:', err.message);
+  return res.status(400).json({ error: err.message || 'Bad request' });
+});
 
 app.get('/api/status', (_, res) => res.json({
   running: !!mcProcess, config: CONFIG, uptime: getUptime(),

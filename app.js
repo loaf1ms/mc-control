@@ -1,5 +1,15 @@
 let ws,isRunning=false,curF='all',allLogs=[],players=[],selT='paper',propsData={},networkInfo={lanIp:'',addresses:[]},configState={memory:'1G',serverDir:''},lastStats={cpu:0,ram:0,diskUsed:0,diskTotal:0};
 
+async function readJsonResponse(r){
+  const text=await r.text();
+  let data={};
+  try{data=text?JSON.parse(text):{};}catch{
+    throw new Error(`Request failed (${r.status} ${r.statusText})`);
+  }
+  if(!r.ok)throw new Error(data.error||`Request failed (${r.status} ${r.statusText})`);
+  return data;
+}
+
 function connect(){
   const p=location.protocol==='https:'?'wss':'ws';
   ws=new WebSocket(p+'://'+location.host);
@@ -494,7 +504,7 @@ async function uploadMod(){
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({filename:f.name,data:b64})
       });
-      const d=await r.json();
+      const d=await readJsonResponse(r);
       if(d.error){
         toast(d.error,'err');st.textContent='Error: '+d.error;
       }else{
@@ -525,7 +535,7 @@ async function uploadPlg(){
     try{
       st.textContent='Uploading '+f.name+'...';
       const r=await fetch('/api/plugins/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:f.name,data:e.target.result.split(',')[1]})});
-      const d=await r.json();
+      const d=await readJsonResponse(r);
       if(d.error){toast(d.error,'err');st.textContent='Error: '+d.error;}
       else{toast('Plugin uploaded!','ok');st.textContent='\u2705 Uploaded';fi.value='';document.getElementById('plgFileName').textContent='No file selected';document.getElementById('bUpPlg').disabled=true;setTimeout(()=>{st.style.display='none';loadPlgs();},1500);}
     }catch(e){toast(e.message,'err');st.textContent='Error: '+e.message;}
