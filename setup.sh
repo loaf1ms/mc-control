@@ -189,7 +189,8 @@ cat > "$UI_DIR/package.json" << 'PKGJSON'
   "scripts": { "start": "node server.js" },
   "dependencies": {
     "express": "^4.18.2",
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "pidusage": "^3.0.2"
   }
 }
 PKGJSON

@@ -77,7 +77,7 @@
         </button>
         <button
           class="hbtn hbtn-ghost"
-          onclick="srvAct('stop')"
+          onclick="srvAct('restart')"
           id="btnRestart"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -406,92 +406,150 @@
           <!-- Bottom Row -->
           <div class="dash-bottom">
             <!-- Server Plan -->
-            <div class="panel">
-              <div class="panel-title">Server Plan</div>
-              <div class="panel-sub">Adjust your server resources</div>
-              <div class="plan-display">
-                <div class="plan-icon">
-                  <span>🦇</span>
-                </div>
-                <div class="plan-info">
-                  <div class="plan-name">
+            <div class="panel plan-panel">
+              <div class="plan-header">
+                <div class="plan-icon-lg"><span>🦇</span></div>
+                <div class="plan-header-info">
+                  <div class="plan-name-lg">
                     Bat <span class="plan-tag">Auto-Sleep</span>
                   </div>
-                  <div class="plan-specs">
-                    <div class="plan-spec">
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
-                        <path
-                          d="M2 3h8v6H2V3Z"
-                          stroke="currentColor"
-                          stroke-width="1.2"
-                          stroke-linejoin="round"
-                        />
-                        <path
-                          d="M4 5v-1M6 5V4M8 5V4"
-                          stroke="currentColor"
-                          stroke-width="1.2"
-                          stroke-linecap="round"
-                        />
-                      </svg>
-                      4GB RAM
-                    </div>
-                    <div class="plan-spec">
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
-                        <ellipse
-                          cx="6"
-                          cy="4"
-                          rx="4"
-                          ry="2"
-                          stroke="currentColor"
-                          stroke-width="1.2"
-                        />
-                        <path
-                          d="M2 4v4c0 1.105 1.79 2 4 2s4-.895 4-2V4"
-                          stroke="currentColor"
-                          stroke-width="1.2"
-                        />
-                      </svg>
-                      10GB Storage
-                    </div>
-                    <div class="plan-spec">
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
-                        <rect
-                          x="3"
-                          y="3"
-                          width="6"
-                          height="6"
-                          rx="1.5"
-                          stroke="currentColor"
-                          stroke-width="1.2"
-                        />
-                        <path
-                          d="M4 1v1M8 1v1M4 10v1M8 10v1M1 4h1M1 8h1M10 4h1M10 8h1"
-                          stroke="currentColor"
-                          stroke-width="1.2"
-                          stroke-linecap="round"
-                        />
-                      </svg>
-                      200% CPU
-                    </div>
-                  </div>
+                  <div class="plan-header-sub">Your current server plan</div>
+                </div>
+                <div
+                  id="statusBadge2"
+                  class="status-badge stopped"
+                  style="margin-left: auto"
+                >
+                  <div class="badge-dot"></div>
+                  <span id="badgeTxt2">STOPPED</span>
                 </div>
               </div>
-              <div class="server-actions">
+
+              <div class="plan-res-grid">
+                <div class="plan-res-card">
+                  <div class="plan-res-label">
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <path
+                        d="M2 3h9v7H2V3Z"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M4 5.5V5M6.5 5.5V5M9 5.5V5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      />
+                      <path
+                        d="M2 6.5H1M11 6.5h1"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                    RAM
+                  </div>
+                  <div class="plan-res-val" id="planRam">─</div>
+                  <div class="plan-res-bar">
+                    <div
+                      class="plan-res-fill ram"
+                      id="planRamBar"
+                      style="width: 0%"
+                    ></div>
+                  </div>
+                  <div class="plan-res-sub" id="planRamSub">of 4 GB</div>
+                </div>
+                <div class="plan-res-card">
+                  <div class="plan-res-label">
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <rect
+                        x="3"
+                        y="3"
+                        width="7"
+                        height="7"
+                        rx="1.5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <path
+                        d="M4 1v1M9 1v1M4 11v1M9 11v1M1 4h1M1 9h1M11 4h1M11 9h1"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                    CPU
+                  </div>
+                  <div class="plan-res-val" id="planCpu">─</div>
+                  <div class="plan-res-bar">
+                    <div
+                      class="plan-res-fill cpu"
+                      id="planCpuBar"
+                      style="width: 0%"
+                    ></div>
+                  </div>
+                  <div class="plan-res-sub">of 200% max</div>
+                </div>
+                <div class="plan-res-card">
+                  <div class="plan-res-label">
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <circle
+                        cx="6.5"
+                        cy="6.5"
+                        r="5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                      />
+                      <path
+                        d="M6.5 4v2.5l1.5 1.5"
+                        stroke="currentColor"
+                        stroke-width="1.2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    Uptime
+                  </div>
+                  <div class="plan-res-val" id="planUp" style="font-size: 14px">
+                    Offline
+                  </div>
+                  <div class="plan-res-sub" id="planUpSub">Not running</div>
+                </div>
+                <div class="plan-res-card">
+                  <div class="plan-res-label">👥 Players</div>
+                  <div class="plan-res-val green" id="planPl">0</div>
+                  <div class="plan-res-sub">online now</div>
+                </div>
+              </div>
+
+              <div class="plan-connect">
+                <div class="plan-connect-row">
+                  <span class="plan-connect-lbl">📡 IP</span>
+                  <span class="plan-connect-val" id="planIP">─</span>
+                  <button
+                    class="icon-btn"
+                    onclick="copyTxt('planIP')"
+                    title="Copy"
+                  >
+                    ⎘
+                  </button>
+                </div>
+                <div class="plan-connect-row">
+                  <span class="plan-connect-lbl">🔌 Port</span>
+                  <span class="plan-connect-val">25565</span>
+                </div>
+                <div class="plan-connect-row">
+                  <span class="plan-connect-lbl">📦 Type</span>
+                  <span class="plan-connect-val" id="planType">─</span>
+                </div>
+                <div class="plan-connect-row">
+                  <span class="plan-connect-lbl">🏷 Ver</span>
+                  <span class="plan-connect-val" id="planVer">─</span>
+                </div>
+              </div>
+
+              <div class="server-actions" style="margin-top: 14px">
                 <button
                   class="abtn primary"
                   id="btnStartMain"
@@ -757,6 +815,15 @@ A DroidMC Minecraft Server</textarea
           </div>
           <div class="panel" style="margin-top: 14px">
             <div class="panel-title">Offline Actions</div>
+            <div style="margin-top: 10px; margin-bottom: 10px">
+              <input
+                class="cfg-inp"
+                id="offPl"
+                type="text"
+                placeholder="Enter player username"
+                style="width: 100%; max-width: 320px"
+              />
+            </div>
             <div
               style="display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px"
             >
@@ -807,10 +874,6 @@ A DroidMC Minecraft Server</textarea
 
           <div class="config-cards">
             <div class="config-card">
-              <div class="config-card-label">CATEGORY</div>
-              <div class="config-card-val" id="cfgCategory">Java</div>
-            </div>
-            <div class="config-card">
               <div class="config-card-label">TYPE</div>
               <div class="config-card-val" id="cfgType">Paper</div>
             </div>
@@ -856,73 +919,46 @@ A DroidMC Minecraft Server</textarea
               </div>
             </div>
 
-            <div class="ver-grid">
-              <div class="field-group">
-                <div class="ver-field-label">
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <rect
-                      x="1.5"
-                      y="1.5"
-                      width="10"
-                      height="10"
-                      rx="2"
-                      stroke="currentColor"
-                      stroke-width="1.2"
-                    />
-                    <path
-                      d="M4 6.5h5M4 4.5h5M4 8.5h3"
-                      stroke="currentColor"
-                      stroke-width="1.2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                  Category
-                </div>
-                <select class="sel" id="catSel">
-                  <option>Java</option>
-                  <option>Bedrock</option>
-                </select>
+            <div class="field-group" style="margin-bottom: 14px">
+              <div class="ver-field-label">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path
+                    d="M2 3l5-1.5L11 3v5L6.5 10.5 2 8V3Z"
+                    stroke="currentColor"
+                    stroke-width="1.2"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                Type
               </div>
-              <div class="field-group">
-                <div class="ver-field-label">
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                    <path
-                      d="M2 3l5-1.5L11 3v5L6.5 10.5 2 8V3Z"
-                      stroke="currentColor"
-                      stroke-width="1.2"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  Type
+              <div class="vtype">
+                <div
+                  class="vtb active"
+                  data-type="paper"
+                  onclick="selType('paper')"
+                >
+                  <span class="vi">📄</span>
+                  <div class="vn">Paper</div>
+                  <div class="vs">Recommended</div>
                 </div>
-                <div class="vtype">
-                  <div
-                    class="vtb active"
-                    data-type="paper"
-                    onclick="selType('paper')"
-                  >
-                    <span class="vi">📄</span>
-                    <div class="vn">Paper</div>
-                    <div class="vs">Recommended</div>
-                  </div>
-                  <div
-                    class="vtb"
-                    data-type="vanilla"
-                    onclick="selType('vanilla')"
-                  >
-                    <span class="vi">🌿</span>
-                    <div class="vn">Vanilla</div>
-                    <div class="vs">Official</div>
-                  </div>
-                  <div
-                    class="vtb"
-                    data-type="fabric"
-                    onclick="selType('fabric')"
-                  >
-                    <span class="vi">🧵</span>
-                    <div class="vn">Fabric</div>
-                    <div class="vs">Modloader</div>
-                  </div>
+                <div
+                  class="vtb"
+                  data-type="vanilla"
+                  onclick="selType('vanilla')"
+                >
+                  <span class="vi">🌿</span>
+                  <div class="vn">Vanilla</div>
+                  <div class="vs">Official</div>
+                </div>
+                <div class="vtb" data-type="fabric" onclick="selType('fabric')">
+                  <span class="vi">🧵</span>
+                  <div class="vn">Fabric</div>
+                  <div class="vs">Modloader</div>
+                </div>
+                <div class="vtb" data-type="forge" onclick="selType('forge')">
+                  <span class="vi">🔨</span>
+                  <div class="vn">Forge</div>
+                  <div class="vs">Modloader</div>
                 </div>
               </div>
             </div>

@@ -53,7 +53,8 @@ async function sendCmd2(){
 
 async function srvAct(a){
   const r=await fetch('/api/'+a,{method:'POST'});const d=await r.json();
-  if(d.error)toast(d.error,'err');else toast(a==='start'?'Starting...':'Stopping...','ok');
+  if(d.error)toast(d.error,'err');
+  else toast(a==='start'?'Starting...':a==='restart'?'Restarting...':'Stopping...','ok');
 }
 
 async function killSrv(){
@@ -74,6 +75,9 @@ function setR(r){
   const badge=document.getElementById('statusBadge');
   const badgeTxt=document.getElementById('badgeTxt');
   if(badge){badge.className='status-badge '+(r?'running':'stopped');badgeTxt.textContent=r?'RUNNING':'STOPPED';}
+  const badge2=document.getElementById('statusBadge2');
+  const badgeTxt2=document.getElementById('badgeTxt2');
+  if(badge2){badge2.className='status-badge '+(r?'running':'stopped');badgeTxt2.textContent=r?'RUNNING':'STOPPED';}
   // Status text in stat card
   const ds=document.getElementById('dStatus');
   if(ds){ds.textContent=r?'Currently running':'Not currently running';}
@@ -96,8 +100,9 @@ function setR(r){
 function setPl(list){
   players=list||[];const n=players.length;
   document.getElementById('tPl').textContent=n;
-  document.getElementById('dPl').textContent=n;
   document.getElementById('plCount').textContent=n+' online';
+  const planPl=document.getElementById('planPl');
+  if(planPl)planPl.textContent=n;
   const nb=document.getElementById('nbPl');
   let b=nb.querySelector('.bdg');
   if(n>0){if(!b){b=document.createElement('div');b.className='bdg';nb.appendChild(b);}b.textContent=n>9?'9+':n;}
@@ -117,30 +122,50 @@ function setUp(u){
   }
   const ds=document.getElementById('dStatus');
   if(ds&&!u)ds.textContent='Not currently running';
+  // Plan panel uptime
+  const planUp=document.getElementById('planUp');
+  const planUpSub=document.getElementById('planUpSub');
+  if(planUp){planUp.textContent=u||'Offline';planUp.style.color=u?'var(--t)':'var(--td)';}
+  if(planUpSub)planUpSub.textContent=u?'running':'Not running';
 }
 
 function updStats(s){
+  // s.cpu = process CPU % (from pidusage), s.ram = process RAM in MB (from pidusage)
   const cpu=Number(s.cpu)||0;
-  const ram=Number(s.ram)||0;
+  const ramMB=Number(s.ram)||0;  // now MB from pidusage
+  const ramPct=Math.min(ramMB/4096*100,100); // assume 4GB allocation for bar
   const cpuCol=cpu>70?'var(--red)':cpu>40?'var(--amber)':'var(--green)';
-  const ramCol=ram>80?'var(--red)':ram>60?'var(--amber)':'var(--green)';
+  const ramCol=ramPct>80?'var(--red)':ramPct>60?'var(--amber)':'var(--green)';
   const cpuTxt=cpu%1===0?cpu.toFixed(0):cpu.toFixed(1);
+  const ramTxt=ramMB>=1024?(ramMB/1024).toFixed(1)+' GB':ramMB.toFixed(0)+' MB';
+  // Top stat cards
   const cpuEl=document.getElementById('dCpu');
   const ramEl=document.getElementById('dRam');
   if(cpuEl){cpuEl.textContent=cpuTxt+'%';cpuEl.style.color=cpuCol;}
-  if(ramEl){ramEl.textContent=ram+'%';ramEl.style.color=ramCol;}
+  if(ramEl){ramEl.textContent=ramTxt;ramEl.style.color=ramCol;}
   document.getElementById('tCpu').textContent=cpuTxt+'%';
-  document.getElementById('tRam').textContent=ram+'%';
-  // Bar fills
+  document.getElementById('tRam').textContent=ramTxt;
+  // Stat card bars
   const cpuBar=document.getElementById('cpuBar');
   const ramBar=document.getElementById('ramBar');
   if(cpuBar){cpuBar.style.width=Math.min(cpu/2,100)+'%';cpuBar.style.background=cpuCol;}
-  if(ramBar){ramBar.style.width=Math.min(ram,100)+'%';ramBar.style.background=ramCol;}
+  if(ramBar){ramBar.style.width=ramPct+'%';ramBar.style.background=ramCol;}
   // Sub labels
   const cpuSub=document.getElementById('cpuSub');
   const ramSub=document.getElementById('ramSub');
   if(cpuSub)cpuSub.textContent='of 200% max';
-  if(ramSub)ramSub.textContent='of 4 GB ('+ram.toFixed(1)+'%)';
+  if(ramSub)ramSub.textContent='of 4 GB ('+ramPct.toFixed(1)+'%)';
+  // Plan panel mini cards
+  const planCpu=document.getElementById('planCpu');
+  const planRam=document.getElementById('planRam');
+  const planCpuBar=document.getElementById('planCpuBar');
+  const planRamBar=document.getElementById('planRamBar');
+  const planRamSub=document.getElementById('planRamSub');
+  if(planCpu){planCpu.textContent=cpuTxt+'%';planCpu.style.color=cpuCol;}
+  if(planRam){planRam.textContent=ramTxt;planRam.style.color=ramCol;}
+  if(planCpuBar){planCpuBar.style.width=Math.min(cpu/2,100)+'%';planCpuBar.style.background=cpuCol;}
+  if(planRamBar){planRamBar.style.width=ramPct+'%';planRamBar.style.background=ramCol;}
+  if(planRamSub)planRamSub.textContent='of 4 GB ('+ramPct.toFixed(1)+'%)';
 }
 
 function apCfg(c){
@@ -155,6 +180,11 @@ function apCfg(c){
   const ciVer=document.getElementById('ciVer');
   if(ciType&&c.serverType)ciType.textContent=c.serverType.charAt(0).toUpperCase()+c.serverType.slice(1);
   if(ciVer&&c.serverVersion)ciVer.textContent=c.serverVersion;
+  // Plan panel
+  const planType=document.getElementById('planType');
+  const planVer=document.getElementById('planVer');
+  if(planType&&c.serverType)planType.textContent=c.serverType.charAt(0).toUpperCase()+c.serverType.slice(1);
+  if(planVer&&c.serverVersion)planVer.textContent=c.serverVersion;
 }
 
 function apNetwork(network,config){
@@ -163,6 +193,8 @@ function apNetwork(network,config){
   const lanIp=networkInfo.lanIp||location.hostname||'127.0.0.1';
   document.getElementById('aLAN').textContent=`${lanIp}:${port}`;
   document.getElementById('ciIP').textContent=lanIp;
+  const planIP=document.getElementById('planIP');
+  if(planIP)planIP.textContent=lanIp;
 }
 
 // ─ Players ─
@@ -274,7 +306,7 @@ async function loadVerList(){
   try{
     const r=await fetch('/api/versions/'+selT);const d=await r.json();
     if(d.error)throw new Error(d.error);
-    sel.innerHTML=d.versions.slice(0,30).map(v=>`<option>${v}</option>`).join('');
+    sel.innerHTML=d.versions.slice(0,50).map(v=>`<option>${v}</option>`).join('');
   }catch(e){sel.innerHTML='<option>Error: '+e.message+'</option>';}
 }
 
@@ -314,10 +346,8 @@ async function loadVI(){
 }
 
 // ─ Properties ─
-const PDEF={'server-name':'A Minecraft Server','motd':'A Minecraft Server','max-players':'20','gamemode':'survival','difficulty':'easy','level-name':'world','level-type':'minecraft:default','level-seed':'','server-port':'25565','online-mode':'true','white-list':'false','view-distance':'10','simulation-distance':'10','max-tick-time':'60000','network-compression-threshold':'256','pvp':'true','spawn-monsters':'true','spawn-animals':'true','spawn-npcs':'true','allow-nether':'true','allow-flight':'false','generate-structures':'true','spawn-protection':'16','enable-command-block':'false','force-gamemode':'false','hardcore':'false','enable-rcon':'false','rcon.port':'25575','enable-query':'false'};
+const PDEF={'max-players':'20','gamemode':'survival','difficulty':'easy','level-name':'world','level-type':'minecraft:default','level-seed':'','server-port':'25565','online-mode':'true','white-list':'false','view-distance':'10','simulation-distance':'10','max-tick-time':'60000','network-compression-threshold':'256','pvp':'true','spawn-monsters':'true','spawn-animals':'true','spawn-npcs':'true','allow-nether':'true','allow-flight':'false','generate-structures':'true','spawn-protection':'16','enable-command-block':'false','force-gamemode':'false','hardcore':'false','enable-rcon':'false','rcon.port':'25575','enable-query':'false'};
 const PMETA={
-  'server-name':         {l:'Server Name',       g:'General'},
-  'motd':                {l:'MOTD',              g:'General'},
   'max-players':         {l:'Max Players',       g:'General',t:'number'},
   'gamemode':            {l:'Default Gamemode',  g:'General',t:'sel',o:['survival','creative','adventure','spectator']},
   'difficulty':          {l:'Difficulty',        g:'General',t:'sel',o:['peaceful','easy','normal','hard']},

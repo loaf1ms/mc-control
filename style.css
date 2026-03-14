@@ -1236,3 +1236,131 @@ body {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .tcontent { padding: 14px 14px 28px; }
 }
+
+/* ─── PLAN PANEL (filled dashboard) ─── */
+.plan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.plan-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.plan-icon-lg {
+  width: 48px;
+  height: 48px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.plan-header-info { flex: 1; min-width: 0; }
+.plan-name-lg { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.plan-header-sub { font-size: 11px; color: var(--td); font-family: var(--mono); }
+
+.plan-res-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.plan-res-card {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.plan-res-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--td);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+}
+
+.plan-res-val {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 5px;
+}
+
+.plan-res-val.green { color: var(--green); }
+
+.plan-res-bar {
+  height: 3px;
+  background: var(--panel3);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.plan-res-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.plan-res-fill.ram { background: var(--green); }
+.plan-res-fill.cpu { background: var(--blue); }
+
+.plan-res-sub {
+  font-size: 10px;
+  color: var(--tm);
+  font-family: var(--mono);
+}
+
+.plan-connect {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px 12px;
+  margin-bottom: 2px;
+}
+
+.plan-connect-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.plan-connect-row:last-child { border-bottom: none; }
+
+.plan-connect-lbl {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--td);
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.plan-connect-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  flex: 1;
+}
+
+/* ─── CONFIG CARDS 3-col (after removing Category) ─── */
+.config-cards {
+  grid-template-columns: repeat(3, 1fr);
+}

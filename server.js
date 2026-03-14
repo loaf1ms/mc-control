@@ -13,6 +13,9 @@ const fs       = require('fs');
 const path     = require('path');
 const os       = require('os');
 
+let pidusage;
+try { pidusage = require('pidusage'); } catch(e) { pidusage = null; }
+
 const app    = express();
 const server = http.createServer(app);
 const wss    = new WebSocketServer({ server });
@@ -85,6 +88,27 @@ function readCpuTimes() {
 }
 
 function updateSystemStats() {
+  // If pidusage is available and MC is running, use process-level stats
+  if (pidusage && mcProcess && mcProcess.pid) {
+    pidusage(mcProcess.pid, (err, stats) => {
+      if (!err && stats) {
+        systemStats = {
+          cpu: parseFloat(stats.cpu.toFixed(1)),
+          ram: parseFloat((stats.memory / 1024 / 1024).toFixed(1)), // MB
+        };
+      } else {
+        // fallback to system stats on error
+        _updateSystemStatsFallback();
+      }
+      broadcast({ type: 'stats', cpu: systemStats.cpu, ram: systemStats.ram });
+    });
+  } else {
+    _updateSystemStatsFallback();
+    broadcast({ type: 'stats', cpu: systemStats.cpu, ram: systemStats.ram });
+  }
+}
+
+function _updateSystemStatsFallback() {
   const totMem = os.totalmem(), freeMem = os.freemem();
   const { idle, total } = readCpuTimes();
   let cpuUsage = 0;
@@ -95,11 +119,12 @@ function updateSystemStats() {
   _prevCpu = { idle, total };
   if (cpuUsage < 0) cpuUsage = 0;
   if (cpuUsage > 100) cpuUsage = 100;
+  // Return RAM in MB (used RAM of total)
+  const usedMB = (totMem - freeMem) / 1024 / 1024;
   systemStats = {
     cpu: Math.round(cpuUsage * 10) / 10,
-    ram: Math.round((totMem - freeMem) / totMem * 100),
+    ram: Math.round(usedMB), // MB
   };
-  broadcast({ type: 'stats', cpu: systemStats.cpu, ram: systemStats.ram });
 }
 
 function addLog(raw, type = 'log') {
@@ -227,6 +252,7 @@ app.post('/api/start', (_, res) => {
   mcProcess.on('error', err => addLog(`Process error: ${err.message}`, 'error'));
   mcProcess.on('exit', code => {
     addLog(`--- Server stopped (exit ${code ?? 'signal'}) ---`, 'system');
+    if (pidusage) { try { pidusage.clear(); } catch(e) {} }
     mcProcess = null; onlinePlayers = {}; startTime = null;
     broadcast({ type: 'status', running: false, players: [], uptime: null });
   });
@@ -241,6 +267,48 @@ app.post('/api/stop', (_, res) => {
   if (!mcProcess) return res.json({ error: 'Not running' });
   mcProcess.stdin.write('stop\n');
   addLog('--- Stop command sent ---', 'system');
+  res.json({ ok: true });
+});
+
+app.post('/api/restart', (_, res) => {
+  const jar = path.join(CONFIG.serverDir, CONFIG.serverJar);
+  if (!fs.existsSync(jar)) {
+    return res.json({ error: `${CONFIG.serverJar} not found in ${CONFIG.serverDir}` });
+  }
+
+  if (!mcProcess) {
+    return res.json({ error: 'Not running' });
+  }
+
+  let restarted = false;
+  mcProcess.once('exit', () => {
+    if (restarted) return;
+    restarted = true;
+
+    const eula = path.join(CONFIG.serverDir, 'eula.txt');
+    if (!fs.existsSync(eula)) fs.writeFileSync(eula, 'eula=true\n');
+
+    mcProcess = spawn(CONFIG.javaPath, [
+      `-Xmx${CONFIG.memory}`, `-Xms${CONFIG.memory}`, '-jar', CONFIG.serverJar, 'nogui'
+    ], { cwd: CONFIG.serverDir, stdio: ['pipe','pipe','pipe'] });
+
+    mcProcess.stdout.on('data', d => String(d).split('\n').forEach(l => addLog(l, 'log')));
+    mcProcess.stderr.on('data', d => String(d).split('\n').forEach(l => addLog(l, 'warn')));
+    mcProcess.on('error', err => addLog(`Process error: ${err.message}`, 'error'));
+    mcProcess.on('exit', code => {
+      addLog(`--- Server stopped (exit ${code ?? 'signal'}) ---`, 'system');
+      if (pidusage) { try { pidusage.clear(); } catch(e) {} }
+      mcProcess = null; onlinePlayers = {}; startTime = null;
+      broadcast({ type: 'status', running: false, players: [], uptime: null });
+    });
+
+    startTime = Date.now();
+    addLog(`--- Restarting ${CONFIG.serverJar} (${CONFIG.memory} RAM) ---`, 'system');
+    broadcast({ type: 'status', running: true });
+  });
+
+  mcProcess.stdin.write('stop\n');
+  addLog('--- Restart command sent ---', 'system');
   res.json({ ok: true });
 });
 
@@ -396,6 +464,26 @@ app.get('/api/versions/fabric', async (_, res) => {
   } catch (e) { res.json({ error: e.message }); }
 });
 
+app.get('/api/versions/forge', async (_, res) => {
+  try {
+    const data = await httpsGet('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json');
+    // data.promos is an object like { "1.21.1-latest": "forge-ver", "1.21.1-recommended": "forge-ver" }
+    const promos = data.promos || {};
+    // Build list: "MC-forgeVer" for recommended versions, newest MC first
+    const seen = new Set();
+    const versions = [];
+    for (const [key, forgeVer] of Object.entries(promos)) {
+      const match = key.match(/^(.+)-(latest|recommended)$/);
+      if (!match) continue;
+      const mcVer = match[1];
+      const label = `${mcVer} - ${forgeVer} (${match[2]})`;
+      if (!seen.has(mcVer+forgeVer)) { seen.add(mcVer+forgeVer); versions.push(label); }
+    }
+    versions.reverse(); // newest first
+    res.json({ versions });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 app.post('/api/download', async (req, res) => {
   if (downloadState && !downloadState.done && !downloadState.error)
     return res.json({ error: 'Download already in progress' });
@@ -466,6 +554,66 @@ app.post('/api/download', async (req, res) => {
       saveConfig();
       fs.writeFileSync(path.join(CONFIG.serverDir, 'eula.txt'), 'eula=true\n');
       addLog(`--- Fabric ${version} ready ? fabric-server-launch.jar ---`, 'system');
+      downloadState.done = true;
+      broadcast({ type: 'download', ...downloadState });
+      broadcast({ type: 'jarReady' });
+      broadcast({ type: 'config', config: CONFIG });
+      return;
+    } else if (type === 'forge') {
+      // version string is like "1.21.1 - 47.3.0 (recommended)"
+      const mcVerMatch = version.match(/^([0-9.]+)/);
+      const forgeVerMatch = version.match(/- ([0-9.]+)/);
+      if (!mcVerMatch || !forgeVerMatch) throw new Error('Could not parse Forge version string');
+      const mcVer = mcVerMatch[1];
+      const forgeVer = forgeVerMatch[1];
+      const forgeInstallerUrl = `https://maven.minecraftforge.net/net/minecraftforge/forge/${mcVer}-${forgeVer}/forge-${mcVer}-${forgeVer}-installer.jar`;
+      const instPath = path.join(CONFIG.serverDir, `forge-${mcVer}-${forgeVer}-installer.jar`);
+
+      addLog(`--- Downloading Forge ${mcVer}-${forgeVer} installer... ---`, 'system');
+      await new Promise((resolve, reject) => {
+        const doGetForge = (url, depth = 0) => {
+          if (depth > 5) return reject(new Error('Too many redirects'));
+          const mod = url.startsWith('https') ? https : http;
+          mod.get(url, { headers: { 'User-Agent': 'DroidMC/2.0' } }, response => {
+            if (response.statusCode >= 300 && response.headers.location) return doGetForge(response.headers.location, depth + 1);
+            if (response.statusCode !== 200) return reject(new Error(`HTTP ${response.statusCode}`));
+            downloadState.total = parseInt(response.headers['content-length'] || '0');
+            let received = 0;
+            const out = fs.createWriteStream(instPath);
+            response.on('data', chunk => { received += chunk.length; downloadState.progress = received; broadcast({ type: 'download', ...downloadState }); });
+            response.pipe(out);
+            out.on('finish', resolve); out.on('error', reject); response.on('error', reject);
+          }).on('error', reject);
+        };
+        doGetForge(forgeInstallerUrl);
+      });
+
+      addLog('--- Running Forge installer (this downloads MC libraries, may take a while)... ---', 'system');
+      downloadState.name = `forge-${mcVer}-${forgeVer} (installing...)`;
+      broadcast({ type: 'download', ...downloadState });
+
+      await new Promise((resolve, reject) => {
+        const inst = spawn(CONFIG.javaPath, ['-jar', instPath, '--installServer'], { cwd: CONFIG.serverDir });
+        inst.stdout.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'system'); }));
+        inst.stderr.on('data', d => String(d).split('\n').forEach(l => { if (l.trim()) addLog(l.trim(), 'warn'); }));
+        inst.on('exit', code => code === 0 ? resolve() : reject(new Error(`Forge installer exited ${code}`)));
+        inst.on('error', reject);
+      });
+
+      try { fs.unlinkSync(instPath); } catch {}
+      // Forge creates a run.sh or @libraries/net/... shim — use the shim jar
+      const shimJar = `forge-${mcVer}-${forgeVer}-shim.jar`;
+      const shimPath = path.join(CONFIG.serverDir, shimJar);
+      const userdevJar = `forge-${mcVer}-${forgeVer}.jar`;
+      const jarToUse = fs.existsSync(shimPath) ? shimJar : (fs.existsSync(path.join(CONFIG.serverDir, userdevJar)) ? userdevJar : null);
+      if (!jarToUse) throw new Error('Forge installed but could not find server jar. Check the server directory for a run.sh or @server.args file.');
+
+      CONFIG.serverJar = jarToUse;
+      CONFIG.serverType = 'forge';
+      CONFIG.serverVersion = `${mcVer}-${forgeVer}`;
+      saveConfig();
+      fs.writeFileSync(path.join(CONFIG.serverDir, 'eula.txt'), 'eula=true\n');
+      addLog(`--- Forge ${mcVer}-${forgeVer} ready --- using ${jarToUse} ---`, 'system');
       downloadState.done = true;
       broadcast({ type: 'download', ...downloadState });
       broadcast({ type: 'jarReady' });
